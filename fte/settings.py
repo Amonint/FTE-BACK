@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -127,3 +130,48 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+UNFOLD = {
+    "SITE_TITLE": "FINE TUNE ENGLISH APP",
+    "SITE_HEADER": "FINE TUNE ENGLISH APP",
+    "SITE_SUBHEADER": "Interactive learning.",
+    
+    "COLORS": {
+        "base": {
+        "50": "245, 247, 250",
+        "100": "235, 239, 245",
+        "200": "215, 222, 235",
+        "300": "190, 200, 220",
+        "400": "160, 175, 200",
+        "500": "130, 145, 175",
+        "600": "100, 115, 145",
+        "700": "70, 85, 115",
+        "800": "40, 55, 85",
+        "900": "20, 35, 60",
+        "950": "10, 20, 35"
+    },
+    "primary": {
+        "50": "230, 241, 249",
+        "100": "204, 226, 243",
+        "200": "153, 198, 231",
+        "300": "102, 170, 219",
+        "400": "51, 141, 207",
+        "500": "1, 102, 153",       
+        "600": "1, 76, 115",
+        "700": "1, 61, 92",
+        "800": "1, 51, 88",         
+        "900": "0, 34, 59",
+        "950": "0, 24, 41"
+    },
+        "font": {
+            "subtle-light": "var(--color-base-500)",  # text-base-500
+            "subtle-dark": "var(--color-base-400)",  # text-base-400
+            "default-light": "var(--color-base-600)",  # text-base-600
+            "default-dark": "var(--color-base-300)",  # text-base-300
+            "important-light": "var(--color-base-900)",  # text-base-900
+            "important-dark": "var(--color-base-100)",  # text-base-100
+        },
+    },
+    
+}
