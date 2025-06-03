@@ -1,64 +1,193 @@
 from django.db import models
-from django.contrib.auth.models import User
 
-class Student(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    student_id = models.CharField(max_length=20, unique=True)
-    date_of_birth = models.DateField(null=True, blank=True)
-    phone = models.CharField(max_length=20, blank=True)
-    address = models.CharField(max_length=255, blank=True)
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 
-    def __str__(self):
-        return f"{self.user.get_full_name()} ({self.student_id})"
-
-class Class(models.Model):
-    name = models.CharField(max_length=100)
-    code = models.CharField(max_length=20, unique=True)
-    description = models.TextField(blank=True)
-    start_date = models.DateField()
-    end_date = models.DateField()
-
-    def __str__(self):
-        return f"{self.name} ({self.code})"
-
-class Enrollment(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE)
-    class_obj = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='enrollments')
-    enrollment_date = models.DateField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
+class Usuario(AbstractUser):
+    cedula = models.CharField(max_length=20, unique=True, null=False)
+    correo = models.EmailField(unique=True, null=False)
+    nombre_completo = models.CharField(max_length=255)
+    foto = models.ImageField(upload_to='usuarios/', null=True, blank=True)
+    nivel_ingles = models.CharField(max_length=50, null=True, blank=True)
+    ultimo_acceso = models.DateTimeField(null=True, blank=True)
+    horario = models.ForeignKey('Horario', on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Add related_name to avoid clashes with auth.User
+    groups = models.ManyToManyField(
+        'auth.Group',
+        related_name='usuario_set',
+        blank=True,
+        help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.',
+        verbose_name='groups',
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        related_name='usuario_set',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        verbose_name='user permissions',
+    )
 
     class Meta:
-        unique_together = ('student', 'class_obj')
+        db_table = 'usuario'
 
-    def __str__(self):
-        return f"{self.student} enrolled in {self.class_obj}"
+class RecuperacionContrasena(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    token = models.CharField(max_length=255)
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    usado = models.BooleanField(default=False)
 
-class Grade(models.Model):
-    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name='grades')
-    value = models.DecimalField(max_digits=5, decimal_places=2)
-    date_recorded = models.DateField(auto_now_add=True)
-    note = models.TextField(blank=True)
+    class Meta:
+        db_table = 'recuperacion_contrasena'
 
-    def __str__(self):
-        return f"{self.enrollment.student} - {self.enrollment.class_obj}: {self.value}"
+class ActividadUsuario(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    tipo_actividad = models.CharField(max_length=50)
+    fecha_hora = models.DateTimeField(auto_now_add=True)
 
-class Certificate(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='certificates')
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
-    date_awarded = models.DateField()
-    file = models.FileField(upload_to='certificates/', blank=True, null=True)
+    class Meta:
+        db_table = 'actividad_usuario'
 
-    def __str__(self):
-        return f"{self.name} - {self.student}"
+class Materia(models.Model):
+    nombre = models.CharField(max_length=255)
+    profesor = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True)
+    aula = models.CharField(max_length=50)
 
-class Payment(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='payments')
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_date = models.DateTimeField(auto_now_add=True)
-    description = models.CharField(max_length=255, blank=True)
-    is_matriculation = models.BooleanField(default=False)
-    transaction_id = models.CharField(max_length=100, blank=True)
+    class Meta:
+        db_table = 'materia'
 
-    def __str__(self):
-        return f"{self.student} - {self.amount} on {self.payment_date.date()}"
+class PeriodoAcademico(models.Model):
+    nombre = models.CharField(max_length=255)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+
+    class Meta:
+        db_table = 'periodo_academico'
+
+class Calificacion(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
+    periodo = models.ForeignKey(PeriodoAcademico, on_delete=models.CASCADE)
+    nota = models.DecimalField(max_digits=4, decimal_places=2)
+    observacion = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'calificacion'
+
+class Asistencia(models.Model):
+    ESTADO_CHOICES = [
+        ('presente', 'Presente'),
+        ('ausente', 'Ausente'),
+        ('justificado', 'Justificado'),
+    ]
+    
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
+    fecha = models.DateField()
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+
+    class Meta:
+        db_table = 'asistencia'
+
+class Horario(models.Model):
+    DIA_CHOICES = [
+        ('lunes', 'Lunes'),
+        ('martes', 'Martes'),
+        ('miercoles', 'Miércoles'),
+        ('jueves', 'Jueves'),
+        ('viernes', 'Viernes'),
+        ('sabado', 'Sábado'),
+        ('domingo', 'Domingo'),
+    ]
+    
+    dia_semana = models.CharField(max_length=20, choices=DIA_CHOICES)
+    hora_inicio = models.TimeField()
+    hora_fin = models.TimeField()
+    materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'horario'
+
+class ClaseVirtual(models.Model):
+    PLATAFORMA_CHOICES = [
+        ('zoom', 'Zoom'),
+        ('meet', 'Meet'),
+    ]
+    
+    materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
+    fecha = models.DateField()
+    hora_inicio = models.TimeField()
+    enlace = models.URLField()
+    plataforma = models.CharField(max_length=20, choices=PLATAFORMA_CHOICES)
+
+    class Meta:
+        db_table = 'clase_virtual'
+
+class Material(models.Model):
+    TIPO_CHOICES = [
+        ('libro', 'Libro'),
+        ('actividad', 'Actividad'),
+        ('video', 'Video'),
+    ]
+    
+    materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
+    titulo = models.CharField(max_length=255)
+    descripcion = models.TextField()
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    url_archivo = models.URLField()
+    fecha_publicacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'material'
+
+class Matricula(models.Model):
+    ESTADO_CHOICES = [
+        ('activa', 'Activa'),
+        ('finalizada', 'Finalizada'),
+    ]
+    
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    periodo = models.ForeignKey(PeriodoAcademico, on_delete=models.CASCADE)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+    materias = models.ManyToManyField(Materia, related_name='matriculas')
+
+    class Meta:
+        db_table = 'matricula'
+
+class Notificacion(models.Model):
+    TIPO_CHOICES = [
+        ('recordatorio', 'Recordatorio'),
+        ('administrativo', 'Administrativo'),
+        ('academico', 'Académico'),
+    ]
+    
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    titulo = models.CharField(max_length=255)
+    mensaje = models.TextField()
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    fecha_envio = models.DateTimeField(auto_now_add=True)
+    leida = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'notificacion'
+
+class Recomendacion(models.Model):
+    TIPO_CHOICES = [
+        ('motivacional', 'Motivacional'),
+        ('academico', 'Académico'),
+    ]
+    
+    ORIGEN_CHOICES = [
+        ('sistema', 'Sistema'),
+        ('manual', 'Manual'),
+    ]
+    
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    mensaje = models.TextField()
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    origen = models.CharField(max_length=20, choices=ORIGEN_CHOICES)
+
+    class Meta:
+        db_table = 'recomendacion' 
