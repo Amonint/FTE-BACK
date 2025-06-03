@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import (
+from fteapp.models import (
     Usuario, Materia, PeriodoAcademico, Calificacion,
     Asistencia, Horario, ClaseVirtual, Material,
     Matricula, Notificacion, Recomendacion
