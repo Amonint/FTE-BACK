@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API FTE-Back</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            width: 200px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test API FTE-Back</h1>
+
+    <div class="section">
+        <h2>Configuración API</h2>
+        <input type="text" id="apiUrl" value="https://fte-back-162929522055.europe-west1.run.app" style="width: 400px;">
+        <button onclick="updateApiUrl()">Actualizar URL</button>
+        <div id="currentUrl"></div>
+    </div>
+
+    <div class="section">
+        <h2>Registro de Usuario</h2>
+        <input type="text" id="regUsername" placeholder="Username">
+        <input type="password" id="regPassword" placeholder="Password">
+        <input type="email" id="regEmail" placeholder="Email">
+        <button onclick="register()">Registrar</button>
+        <div id="regError" class="error"></div>
+        <pre id="regResponse"></pre>
+    </div>
+
+    <div class="section">
+        <h2>Inicio de Sesión</h2>
+        <input type="text" id="loginUsername" placeholder="Username">
+        <input type="password" id="loginPassword" placeholder="Password">
+        <button onclick="login()">Iniciar Sesión</button>
+        <div id="loginError" class="error"></div>
+        <pre id="loginResponse"></pre>
+    </div>
+
+    <div class="section">
+        <h2>Materias</h2>
+        <button onclick="getMaterias()">Obtener Materias</button>
+        <div id="materiasError" class="error"></div>
+        <pre id="materiasResponse"></pre>
+    </div>
+
+    <div class="section">
+        <h2>Clases Virtuales</h2>
+        <button onclick="getClasesVirtuales()">Obtener Clases Virtuales</button>
+        <div id="clasesError" class="error"></div>
+        <pre id="clasesResponse"></pre>
+    </div>
+
+    <script>
+        let API_URL = localStorage.getItem('apiUrl') || 'https://fte-back-162929522055.europe-west1.run.app';
+        let token = localStorage.getItem('token');
+
+        // Mostrar la URL actual
+        document.getElementById('apiUrl').value = API_URL;
+        document.getElementById('currentUrl').textContent = `URL actual: ${API_URL}`;
+
+        function updateApiUrl() {
+            API_URL = document.getElementById('apiUrl').value.trim();
+            localStorage.setItem('apiUrl', API_URL);
+            document.getElementById('currentUrl').textContent = `URL actual: ${API_URL}`;
+        }
+
+        async function register() {
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+            const email = document.getElementById('regEmail').value;
+            
+            // Limpiar mensajes anteriores
+            document.getElementById('regError').textContent = '';
+            document.getElementById('regResponse').textContent = '';
+
+            try {
+                console.log('Intentando registro con:', `${API_URL}/api/auth/register/`);
+                
+                const response = await fetch(`${API_URL}/api/auth/register/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                        email
+                    })
+                });
+
+                console.log('Status:', response.status);
+                console.log('Headers:', Object.fromEntries(response.headers.entries()));
+
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    document.getElementById('regResponse').textContent = JSON.stringify(data, null, 2);
+                    
+                    if (response.ok) {
+                        token = data.token;
+                        localStorage.setItem('token', token);
+                        document.getElementById('regError').textContent = '¡Registro exitoso!';
+                        document.getElementById('regError').className = 'success';
+                    } else {
+                        document.getElementById('regError').textContent = `Error: ${data.error || 'Error desconocido'}`;
+                    }
+                } else {
+                    const text = await response.text();
+                    console.error('Respuesta no JSON:', text);
+                    document.getElementById('regError').textContent = 'Error: El servidor no respondió con JSON';
+                    document.getElementById('regResponse').textContent = text;
+                }
+            } catch (error) {
+                console.error('Error completo:', error);
+                document.getElementById('regError').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            // Limpiar mensajes anteriores
+            document.getElementById('loginError').textContent = '';
+            document.getElementById('loginResponse').textContent = '';
+
+            try {
+                console.log('Intentando login con:', `${API_URL}/api/auth/login/`);
+                
+                const response = await fetch(`${API_URL}/api/auth/login/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password
+                    })
+                });
+
+                console.log('Status:', response.status);
+                console.log('Headers:', Object.fromEntries(response.headers.entries()));
+
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    document.getElementById('loginResponse').textContent = JSON.stringify(data, null, 2);
+                    
+                    if (response.ok) {
+                        token = data.token;
+                        localStorage.setItem('token', token);
+                        document.getElementById('loginError').textContent = '¡Login exitoso!';
+                        document.getElementById('loginError').className = 'success';
+                    } else {
+                        document.getElementById('loginError').textContent = `Error: ${data.error || 'Error desconocido'}`;
+                    }
+                } else {
+                    const text = await response.text();
+                    console.error('Respuesta no JSON:', text);
+                    document.getElementById('loginError').textContent = 'Error: El servidor no respondió con JSON';
+                    document.getElementById('loginResponse').textContent = text;
+                }
+            } catch (error) {
+                console.error('Error completo:', error);
+                document.getElementById('loginError').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function getMaterias() {
+            // Limpiar mensajes anteriores
+            document.getElementById('materiasError').textContent = '';
+            document.getElementById('materiasResponse').textContent = '';
+
+            try {
+                const response = await fetch(`${API_URL}/api/materias/`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    document.getElementById('materiasResponse').textContent = JSON.stringify(data, null, 2);
+                    
+                    if (!response.ok) {
+                        document.getElementById('materiasError').textContent = `Error: ${data.error || 'Error desconocido'}`;
+                    }
+                } else {
+                    const text = await response.text();
+                    console.error('Respuesta no JSON:', text);
+                    document.getElementById('materiasError').textContent = 'Error: El servidor no respondió con JSON';
+                    document.getElementById('materiasResponse').textContent = text;
+                }
+            } catch (error) {
+                console.error('Error completo:', error);
+                document.getElementById('materiasError').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function getClasesVirtuales() {
+            // Limpiar mensajes anteriores
+            document.getElementById('clasesError').textContent = '';
+            document.getElementById('clasesResponse').textContent = '';
+
+            try {
+                const response = await fetch(`${API_URL}/api/clases-virtuales/`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    document.getElementById('clasesResponse').textContent = JSON.stringify(data, null, 2);
+                    
+                    if (!response.ok) {
+                        document.getElementById('clasesError').textContent = `Error: ${data.error || 'Error desconocido'}`;
+                    }
+                } else {
+                    const text = await response.text();
+                    console.error('Respuesta no JSON:', text);
+                    document.getElementById('clasesError').textContent = 'Error: El servidor no respondió con JSON';
+                    document.getElementById('clasesResponse').textContent = text;
+                }
+            } catch (error) {
+                console.error('Error completo:', error);
+                document.getElementById('clasesError').textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html> 
