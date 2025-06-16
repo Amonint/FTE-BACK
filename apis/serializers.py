@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.contrib.auth.hashers import make_password
 from fteapp.models import (
     Usuario, Materia, PeriodoAcademico, Calificacion,
     Asistencia, Horario, ClaseVirtual, Material,
@@ -10,10 +11,23 @@ class UsuarioSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Usuario
-        fields = ['id', 'username', 'password', 'cedula', 'correo', 'nombre_completo', 
+        fields = ['id', 'username', 'password', 'cedula', 'email', 'nombre_completo', 
                  'foto', 'nivel_ingles', 'ultimo_acceso', 'horario']
         read_only_fields = ['ultimo_acceso']
         extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = Usuario(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        if 'password' in validated_data:
+            password = validated_data.pop('password')
+            instance.set_password(password)
+        return super().update(instance, validated_data)
 
 class MateriaSerializer(serializers.ModelSerializer):
     profesor_nombre = serializers.CharField(source='profesor.nombre_completo', read_only=True)

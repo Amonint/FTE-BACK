@@ -1,12 +1,10 @@
 from django.db import models
-
-from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from django.contrib.auth.hashers import make_password
 
 class Usuario(AbstractUser):
     cedula = models.CharField(max_length=20, unique=True, null=False)
-    correo = models.EmailField(unique=True, null=False)
     nombre_completo = models.CharField(max_length=255)
     foto = models.ImageField(upload_to='usuarios/', null=True, blank=True)
     nivel_ingles = models.CharField(max_length=50, null=True, blank=True)
@@ -31,6 +29,16 @@ class Usuario(AbstractUser):
 
     class Meta:
         db_table = 'usuario'
+
+    def save(self, *args, **kwargs):
+        # Make email required
+        if not self.email:
+            raise ValueError('El campo email es obligatorio')
+        super().save(*args, **kwargs)
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+        self._password = raw_password
 
 class RecuperacionContrasena(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)

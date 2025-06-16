@@ -8,7 +8,9 @@ automatic_scaling:
   min_instances: 1
   max_instances: 10
 
-entrypoint: gunicorn -b :$PORT fteback.wsgi:application
+entrypoint: >
+  bash -c "python manage.py migrate --noinput &&
+  gunicorn -b :$PORT fteback.wsgi:application"
 
 env_variables:
   DJANGO_SETTINGS_MODULE: "fteback.settings"

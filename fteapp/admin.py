@@ -8,8 +8,8 @@ from .models import (
 
 @admin.register(Usuario)
 class UsuarioAdmin(ModelAdmin):
-    list_display = ('username', 'cedula', 'correo', 'nombre_completo', 'nivel_ingles', 'ultimo_acceso')
-    search_fields = ('username', 'cedula', 'correo', 'nombre_completo')
+    list_display = ('username', 'cedula', 'email', 'nombre_completo', 'nivel_ingles', 'ultimo_acceso')
+    search_fields = ('username', 'cedula', 'email', 'nombre_completo')
     list_filter = ('nivel_ingles',)
 
 @admin.register(RecuperacionContrasena)

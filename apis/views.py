@@ -3,7 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
+import logging
 from fteapp.models import (
     Usuario, Materia, PeriodoAcademico, Calificacion,
     Asistencia, Horario, ClaseVirtual, Material,
@@ -16,13 +17,44 @@ from .serializers import (
     NotificacionSerializer, RecomendacionSerializer
 )
 
+logger = logging.getLogger(__name__)
+
 class AuthViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
+
+    @action(detail=False, methods=['post'])
+    def register(self, request):
+        logger.info(f"Datos recibidos en registro: {request.data}")
+        serializer = UsuarioSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            logger.info(f"Datos validados: {serializer.validated_data}")
+            try:
+                # Create and save user
+                user = serializer.save()
+                logger.info(f"Usuario creado exitosamente: {user.username}")
+                
+                # Generate token
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    'token': str(refresh.access_token),
+                    'refresh': str(refresh),
+                    'user': UsuarioSerializer(user).data
+                }, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                logger.error(f"Error al crear usuario: {str(e)}")
+                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.error(f"Errores de validación: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'])
     def login(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
+        
+        logger.info(f"Intento de login - Usuario: {username}")
+        logger.info(f"Datos recibidos en login: {request.data}")
 
         if not username or not password:
             return Response(
@@ -30,42 +62,34 @@ class AuthViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = authenticate(username=username, password=password)
+        # Verificar si el usuario existe
+        try:
+            user_exists = Usuario.objects.filter(username=username).exists()
+            logger.info(f"¿Usuario existe en BD?: {user_exists}")
+            if user_exists:
+                user_obj = Usuario.objects.get(username=username)
+                logger.info(f"Hash de contraseña almacenado: {user_obj.password[:20]}...")
+        except Exception as e:
+            logger.error(f"Error al verificar usuario: {str(e)}")
 
-        if user:
+        # Usar authenticate de Django
+        user = authenticate(username=username, password=password)
+        logger.info(f"Resultado de authenticate: {'éxito' if user else 'fallido'}")
+        
+        if user is not None and user.is_active:
+            logger.info(f"Usuario autenticado correctamente: {user.username}")
             refresh = RefreshToken.for_user(user)
             return Response({
                 'token': str(refresh.access_token),
                 'refresh': str(refresh),
                 'user': UsuarioSerializer(user).data
             })
-        return Response(
-            {'error': 'Credenciales inválidas'},
-            status=status.HTTP_401_UNAUTHORIZED
-        )
-
-    @action(detail=False, methods=['post'])
-    def register(self, request):
-        serializer = UsuarioSerializer(data=request.data)
-        if serializer.is_valid():
-            # Crear el usuario con la contraseña hasheada
-            user = Usuario.objects.create_user(
-                username=serializer.validated_data['username'],
-                password=serializer.validated_data['password'],
-                email=serializer.validated_data['correo'],
-                cedula=serializer.validated_data['cedula'],
-                correo=serializer.validated_data['correo'],
-                nombre_completo=serializer.validated_data['nombre_completo']
+        else:
+            logger.warning(f"Credenciales inválidas para usuario: {username}")
+            return Response(
+                {'error': 'Credenciales inválidas'},
+                status=status.HTTP_401_UNAUTHORIZED
             )
-            
-            # Generar el token
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                'token': str(refresh.access_token),
-                'refresh': str(refresh),
-                'user': UsuarioSerializer(user).data
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
