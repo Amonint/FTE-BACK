@@ -11,7 +11,13 @@ automatic_scaling:
 entrypoint: gunicorn -b :$PORT fteback.wsgi:application
 
 env_variables:
-  DJANGO_SETTINGS_MODULE: "fteback.settings_prod"
+  DJANGO_SETTINGS_MODULE: "fteback.settings"
+  DB_NAME: "fte"
+  DB_USER: "postgres"
+  DB_PASSWORD: "admin"
+  DB_HOST: "/cloudsql/fte-backend-prod:europe-west1:fte-instance"
+  DB_PORT: "5432"
+  DEBUG: "False"
 
 handlers:
 - url: /static
