@@ -48,7 +48,7 @@
 
     <div class="section">
         <h2>Configuración API</h2>
-        <input type="text" id="apiUrl" value="https://fte-back-162929522055.europe-west1.run.app" style="width: 400px;">
+        <input type="text" id="apiUrl" value="https://fte-backend-prod.ew.r.appspot.com" style="width: 400px;">
         <button onclick="updateApiUrl()">Actualizar URL</button>
         <div id="currentUrl"></div>
     </div>
@@ -58,6 +58,8 @@
         <input type="text" id="regUsername" placeholder="Username">
         <input type="password" id="regPassword" placeholder="Password">
         <input type="email" id="regEmail" placeholder="Email">
+        <input type="text" id="regCedula" placeholder="Cédula">
+        <input type="text" id="regNombreCompleto" placeholder="Nombre Completo">
         <button onclick="register()">Registrar</button>
         <div id="regError" class="error"></div>
         <pre id="regResponse"></pre>
@@ -87,16 +89,25 @@
     </div>
 
     <script>
-        let API_URL = localStorage.getItem('apiUrl') || 'https://fte-back-162929522055.europe-west1.run.app';
+        // Forzar la URL correcta
+        localStorage.removeItem('apiUrl');
+        const API_URL = 'https://fte-backend-prod.ew.r.appspot.com';
         let token = localStorage.getItem('token');
 
         // Mostrar la URL actual
         document.getElementById('apiUrl').value = API_URL;
         document.getElementById('currentUrl').textContent = `URL actual: ${API_URL}`;
 
+        // Función para actualizar los campos de login después de un registro exitoso
+        function updateLoginFields(username, password) {
+            document.getElementById('loginUsername').value = username;
+            document.getElementById('loginPassword').value = password;
+        }
+
         function updateApiUrl() {
-            API_URL = document.getElementById('apiUrl').value.trim();
-            localStorage.setItem('apiUrl', API_URL);
+            // Deshabilitar la actualización de URL para evitar problemas de CORS
+            alert('La URL del API no puede ser modificada');
+            document.getElementById('apiUrl').value = API_URL;
             document.getElementById('currentUrl').textContent = `URL actual: ${API_URL}`;
         }
 
@@ -104,48 +115,57 @@
             const username = document.getElementById('regUsername').value;
             const password = document.getElementById('regPassword').value;
             const email = document.getElementById('regEmail').value;
+            const cedula = document.getElementById('regCedula').value;
+            const nombreCompleto = document.getElementById('regNombreCompleto').value;
             
-            // Limpiar mensajes anteriores
             document.getElementById('regError').textContent = '';
             document.getElementById('regResponse').textContent = '';
 
+            const data = {
+                username: username,
+                password: password,
+                cedula: cedula,
+                correo: email,
+                nombre_completo: nombreCompleto
+            };
+
             try {
-                console.log('Intentando registro con:', `${API_URL}/api/auth/register/`);
-                
                 const response = await fetch(`${API_URL}/api/auth/register/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({
-                        username,
-                        password,
-                        email
-                    })
+                    body: JSON.stringify(data)
                 });
 
-                console.log('Status:', response.status);
-                console.log('Headers:', Object.fromEntries(response.headers.entries()));
-
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    const data = await response.json();
-                    document.getElementById('regResponse').textContent = JSON.stringify(data, null, 2);
+                if (response.ok) {
+                    const responseData = await response.json();
+                    console.log('Response data:', responseData);
+                    document.getElementById('regResponse').textContent = JSON.stringify(responseData, null, 2);
+                    document.getElementById('regError').textContent = '¡Registro exitoso!';
+                    document.getElementById('regError').className = 'success';
                     
-                    if (response.ok) {
-                        token = data.token;
-                        localStorage.setItem('token', token);
-                        document.getElementById('regError').textContent = '¡Registro exitoso!';
-                        document.getElementById('regError').className = 'success';
-                    } else {
-                        document.getElementById('regError').textContent = `Error: ${data.error || 'Error desconocido'}`;
-                    }
+                    // Actualizar token y campos de login
+                    token = responseData.token;
+                    localStorage.setItem('token', token);
+                    
+                    // Guardar las credenciales para el login
+                    const storedCredentials = {
+                        username: username,
+                        password: password
+                    };
+                    localStorage.setItem('lastCredentials', JSON.stringify(storedCredentials));
+                    
+                    // Actualizar campos de login
+                    updateLoginFields(username, password);
+                    
+                    // Intentar login automático
+                    await login(true);
                 } else {
-                    const text = await response.text();
-                    console.error('Respuesta no JSON:', text);
-                    document.getElementById('regError').textContent = 'Error: El servidor no respondió con JSON';
-                    document.getElementById('regResponse').textContent = text;
+                    const errorData = await response.json();
+                    console.error('Error response:', errorData);
+                    document.getElementById('regError').textContent = `Error: ${JSON.stringify(errorData)}`;
                 }
             } catch (error) {
                 console.error('Error completo:', error);
@@ -153,50 +173,60 @@
             }
         }
 
-        async function login() {
-            const username = document.getElementById('loginUsername').value;
-            const password = document.getElementById('loginPassword').value;
+        async function login(isAutoLogin = false) {
+            let username, password;
             
-            // Limpiar mensajes anteriores
+            if (isAutoLogin) {
+                // Usar las credenciales almacenadas del último registro
+                const storedCredentials = JSON.parse(localStorage.getItem('lastCredentials') || '{}');
+                username = storedCredentials.username;
+                password = storedCredentials.password;
+            } else {
+                // Usar las credenciales ingresadas en el formulario
+                username = document.getElementById('loginUsername').value;
+                password = document.getElementById('loginPassword').value;
+            }
+            
+            if (!username || !password) {
+                document.getElementById('loginError').textContent = 'Por favor ingrese usuario y contraseña';
+                return;
+            }
+            
             document.getElementById('loginError').textContent = '';
             document.getElementById('loginResponse').textContent = '';
 
+            const data = {
+                username: username,
+                password: password
+            };
+
             try {
-                console.log('Intentando login con:', `${API_URL}/api/auth/login/`);
-                
                 const response = await fetch(`${API_URL}/api/auth/login/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({
-                        username,
-                        password
-                    })
+                    body: JSON.stringify(data)
                 });
 
-                console.log('Status:', response.status);
-                console.log('Headers:', Object.fromEntries(response.headers.entries()));
-
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    const data = await response.json();
-                    document.getElementById('loginResponse').textContent = JSON.stringify(data, null, 2);
-                    
-                    if (response.ok) {
-                        token = data.token;
-                        localStorage.setItem('token', token);
-                        document.getElementById('loginError').textContent = '¡Login exitoso!';
-                        document.getElementById('loginError').className = 'success';
-                    } else {
-                        document.getElementById('loginError').textContent = `Error: ${data.error || 'Error desconocido'}`;
-                    }
+                if (response.ok) {
+                    const responseData = await response.json();
+                    console.log('Response data:', responseData);
+                    token = responseData.token;
+                    localStorage.setItem('token', token);
+                    document.getElementById('loginResponse').textContent = JSON.stringify(responseData, null, 2);
+                    document.getElementById('loginError').textContent = '¡Login exitoso!';
+                    document.getElementById('loginError').className = 'success';
                 } else {
-                    const text = await response.text();
-                    console.error('Respuesta no JSON:', text);
-                    document.getElementById('loginError').textContent = 'Error: El servidor no respondió con JSON';
-                    document.getElementById('loginResponse').textContent = text;
+                    const errorData = await response.json();
+                    console.error('Error response:', errorData);
+                    document.getElementById('loginError').textContent = `Error: ${JSON.stringify(errorData)}`;
+                    
+                    // Si el login automático falla, limpiar las credenciales almacenadas
+                    if (isAutoLogin) {
+                        localStorage.removeItem('lastCredentials');
+                    }
                 }
             } catch (error) {
                 console.error('Error completo:', error);
@@ -205,31 +235,37 @@
         }
 
         async function getMaterias() {
-            // Limpiar mensajes anteriores
             document.getElementById('materiasError').textContent = '';
             document.getElementById('materiasResponse').textContent = '';
 
+            if (!token) {
+                document.getElementById('materiasError').textContent = 'Error: Debes iniciar sesión primero';
+                return;
+            }
+
             try {
                 const response = await fetch(`${API_URL}/api/materias/`, {
+                    method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/json'
                     }
                 });
 
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
+                if (response.ok) {
                     const data = await response.json();
+                    console.log('Response data:', data);
                     document.getElementById('materiasResponse').textContent = JSON.stringify(data, null, 2);
-                    
-                    if (!response.ok) {
-                        document.getElementById('materiasError').textContent = `Error: ${data.error || 'Error desconocido'}`;
-                    }
                 } else {
-                    const text = await response.text();
-                    console.error('Respuesta no JSON:', text);
-                    document.getElementById('materiasError').textContent = 'Error: El servidor no respondió con JSON';
-                    document.getElementById('materiasResponse').textContent = text;
+                    const errorData = await response.json();
+                    console.error('Error response:', errorData);
+                    if (errorData.code === 'token_not_valid') {
+                        localStorage.removeItem('token');
+                        token = null;
+                        document.getElementById('materiasError').textContent = 'Error: Sesión expirada. Por favor, inicia sesión nuevamente.';
+                    } else {
+                        document.getElementById('materiasError').textContent = `Error: ${JSON.stringify(errorData)}`;
+                    }
                 }
             } catch (error) {
                 console.error('Error completo:', error);
@@ -238,31 +274,37 @@
         }
 
         async function getClasesVirtuales() {
-            // Limpiar mensajes anteriores
             document.getElementById('clasesError').textContent = '';
             document.getElementById('clasesResponse').textContent = '';
 
+            if (!token) {
+                document.getElementById('clasesError').textContent = 'Error: Debes iniciar sesión primero';
+                return;
+            }
+
             try {
                 const response = await fetch(`${API_URL}/api/clases-virtuales/`, {
+                    method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/json'
                     }
                 });
 
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
+                if (response.ok) {
                     const data = await response.json();
+                    console.log('Response data:', data);
                     document.getElementById('clasesResponse').textContent = JSON.stringify(data, null, 2);
-                    
-                    if (!response.ok) {
-                        document.getElementById('clasesError').textContent = `Error: ${data.error || 'Error desconocido'}`;
-                    }
                 } else {
-                    const text = await response.text();
-                    console.error('Respuesta no JSON:', text);
-                    document.getElementById('clasesError').textContent = 'Error: El servidor no respondió con JSON';
-                    document.getElementById('clasesResponse').textContent = text;
+                    const errorData = await response.json();
+                    console.error('Error response:', errorData);
+                    if (errorData.code === 'token_not_valid') {
+                        localStorage.removeItem('token');
+                        token = null;
+                        document.getElementById('clasesError').textContent = 'Error: Sesión expirada. Por favor, inicia sesión nuevamente.';
+                    } else {
+                        document.getElementById('clasesError').textContent = `Error: ${JSON.stringify(errorData)}`;
+                    }
                 }
             } catch (error) {
                 console.error('Error completo:', error);

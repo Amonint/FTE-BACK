@@ -29,8 +29,18 @@ class Usuario(AbstractUser):
         verbose_name='user permissions',
     )
 
+    # Override the email field to use correo
+    email = None  # Disable the email field from AbstractUser
+    REQUIRED_FIELDS = ['cedula', 'correo', 'nombre_completo']  # Required for createsuperuser
+
     class Meta:
         db_table = 'usuario'
+
+    def save(self, *args, **kwargs):
+        # Update last access time on save
+        if not self.pk:  # Only on creation
+            self.ultimo_acceso = timezone.now()
+        super().save(*args, **kwargs)
 
 class RecuperacionContrasena(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)

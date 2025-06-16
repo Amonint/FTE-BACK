@@ -1,30 +1,28 @@
 # Use Python 3.11 slim image
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8080
-
-# Set work directory
+# Establecer directorio de trabajo
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    python3-dev \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
+# Copiar requirements.txt
 COPY requirements.txt .
+
+# Instalar dependencias de Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# Copiar el código de la aplicación
 COPY . .
 
-# Collect static files
+# Recolectar archivos estáticos
 RUN python manage.py collectstatic --noinput --settings=fteback.settings_prod
 
-# Run gunicorn
-CMD exec gunicorn --bind 0.0.0.0:$PORT fteback.wsgi:application --workers 2 --threads 2 --timeout 120 
+# Configurar variables de entorno
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=fteback.settings_prod
+
+# Exponer el puerto
+EXPOSE 8080
+
+# Comando para iniciar la aplicación
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 fteback.wsgi:application 
