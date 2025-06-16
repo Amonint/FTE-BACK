@@ -6,36 +6,14 @@ from fteapp.models import (
 )
 
 class UsuarioSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True)
+    password = serializers.CharField(write_only=True)
     
     class Meta:
         model = Usuario
         fields = ['id', 'username', 'password', 'cedula', 'correo', 'nombre_completo', 
                  'foto', 'nivel_ingles', 'ultimo_acceso', 'horario']
         read_only_fields = ['ultimo_acceso']
-        extra_kwargs = {
-            'password': {'write_only': True}
-        }
-    
-    def create(self, validated_data):
-        # Remove email if it's in the data to prevent conflicts
-        validated_data.pop('email', None)
-        
-        # Create user with remaining data
-        password = validated_data.pop('password')
-        user = Usuario.objects.create_user(
-            password=password,
-            **validated_data
-        )
-        return user
-    
-    def update(self, instance, validated_data):
-        if 'password' in validated_data:
-            password = validated_data.pop('password')
-            instance.set_password(password)
-        # Remove email if it's in the data
-        validated_data.pop('email', None)
-        return super().update(instance, validated_data)
+        extra_kwargs = {'password': {'write_only': True}}
 
 class MateriaSerializer(serializers.ModelSerializer):
     profesor_nombre = serializers.CharField(source='profesor.nombre_completo', read_only=True)

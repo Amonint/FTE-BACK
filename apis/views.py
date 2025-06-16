@@ -2,7 +2,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import make_password
 from fteapp.models import (
     Usuario, Materia, PeriodoAcademico, Calificacion,
@@ -15,9 +15,6 @@ from .serializers import (
     ClaseVirtualSerializer, MaterialSerializer, MatriculaSerializer,
     NotificacionSerializer, RecomendacionSerializer
 )
-import logging
-
-logger = logging.getLogger(__name__)
 
 class AuthViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
@@ -27,74 +24,47 @@ class AuthViewSet(viewsets.ViewSet):
         username = request.data.get('username')
         password = request.data.get('password')
 
-        logger.debug(f"Login attempt for username: {username}")
-        logger.debug(f"Password length: {len(password) if password else 0}")
-
         if not username or not password:
             return Response(
                 {'error': 'Por favor proporcione username y password'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Try to get the user first
-        User = get_user_model()
-        try:
-            user = User.objects.get(username=username)
-            logger.debug(f"User found: {user.username}")
-            logger.debug(f"Stored password hash: {user.password[:20]}...")  # Only log first 20 chars of hash
-            
-            # Try manual password verification first
-            if user.check_password(password):
-                logger.debug("Manual password check succeeded")
-                # Generate tokens
-                refresh = RefreshToken.for_user(user)
-                return Response({
-                    'token': str(refresh.access_token),
-                    'refresh': str(refresh),
-                    'user': UsuarioSerializer(user).data
-                })
-            else:
-                logger.debug("Manual password check failed")
-                return Response(
-                    {'error': 'Credenciales inválidas'},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-                
-        except User.DoesNotExist:
-            logger.debug(f"User not found: {username}")
-            return Response(
-                {'error': 'Credenciales inválidas'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+        user = authenticate(username=username, password=password)
+
+        if user:
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'token': str(refresh.access_token),
+                'refresh': str(refresh),
+                'user': UsuarioSerializer(user).data
+            })
+        return Response(
+            {'error': 'Credenciales inválidas'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
     @action(detail=False, methods=['post'])
     def register(self, request):
         serializer = UsuarioSerializer(data=request.data)
         if serializer.is_valid():
-            logger.debug(f"Registration data valid for username: {request.data.get('username')}")
-            try:
-                # Use the serializer's create method which properly handles password
-                user = serializer.save()
-                logger.debug(f"User created successfully: {user.username}")
-                logger.debug(f"Password was hashed: {user.password[:20]}...")  # Only log first 20 chars of hash
-                
-                # Verify the password works
-                if not user.check_password(request.data.get('password')):
-                    logger.error("Password verification failed immediately after creation!")
-                else:
-                    logger.debug("Password verification successful")
-                
-                # Generate tokens
-                refresh = RefreshToken.for_user(user)
-                return Response({
-                    'token': str(refresh.access_token),
-                    'refresh': str(refresh),
-                    'user': serializer.data
-                }, status=status.HTTP_201_CREATED)
-            except Exception as e:
-                logger.error(f"Error creating user: {str(e)}")
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        logger.debug(f"Registration validation errors: {serializer.errors}")
+            # Crear el usuario con la contraseña hasheada
+            user = Usuario.objects.create_user(
+                username=serializer.validated_data['username'],
+                password=serializer.validated_data['password'],
+                email=serializer.validated_data['correo'],
+                cedula=serializer.validated_data['cedula'],
+                correo=serializer.validated_data['correo'],
+                nombre_completo=serializer.validated_data['nombre_completo']
+            )
+            
+            # Generar el token
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'token': str(refresh.access_token),
+                'refresh': str(refresh),
+                'user': UsuarioSerializer(user).data
+            }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UsuarioViewSet(viewsets.ModelViewSet):
