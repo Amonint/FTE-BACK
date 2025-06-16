@@ -18,16 +18,23 @@ class UsuarioSerializer(serializers.ModelSerializer):
         }
     
     def create(self, validated_data):
+        # Remove email if it's in the data to prevent conflicts
+        validated_data.pop('email', None)
+        
+        # Create user with remaining data
         password = validated_data.pop('password')
-        user = Usuario.objects.create_user(**validated_data)
-        user.set_password(password)
-        user.save()
+        user = Usuario.objects.create_user(
+            password=password,
+            **validated_data
+        )
         return user
     
     def update(self, instance, validated_data):
         if 'password' in validated_data:
             password = validated_data.pop('password')
             instance.set_password(password)
+        # Remove email if it's in the data
+        validated_data.pop('email', None)
         return super().update(instance, validated_data)
 
 class MateriaSerializer(serializers.ModelSerializer):
